@@ -2,9 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Fleet Tracking</title>
+  <title>Vehicle Tracking</title>
 </head>
 <body>
-  <h1>Fleet Tracking is working ✅</h1>
+
+  <h2>Vehicle Monitoring</h2>
+
+  <label>
+    Vehicle ID:
+    <input type="text" id="vehicleId" placeholder="CAM-01">
+  </label>
+
+  <br><br>
+
+  <button onclick="startTracking()">Start Monitoring</button>
+
+  <p id="status">Waiting to start...</p>
+
+  <script>
+    function startTracking() {
+      const vehicleId = document.getElementById("vehicleId").value;
+
+      if (!vehicleId) {
+        alert("Please enter the vehicle ID");
+        return;
+      }
+
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by this browser");
+        return;
+      }
+
+      document.getElementById("status").innerText =
+        "Monitoring started for " + vehicleId;
+
+      navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          document.getElementById("status").innerText =
+            "Vehicle: " + vehicleId +
+            " | Lat: " + lat.toFixed(6) +
+            " | Lon: " + lon.toFixed(6);
+        },
+        (error) => {
+          alert("Error getting location");
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 5000
+        }
+      );
+    }
+  </script>
+
 </body>
 </html>
