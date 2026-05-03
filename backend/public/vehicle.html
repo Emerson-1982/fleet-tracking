@@ -1,53 +1,68 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Vehicle Tracking</title>
+  <title>Monitoramento de Veículos</title>
 </head>
 <body>
 
-  <h2>Vehicle Monitoring</h2>
+  <h2>Monitoramento de veículos</h2>
 
   <label>
-    Vehicle ID:
+    Identificação do veículo:
     <input type="text" id="vehicleId" placeholder="CAM-01">
   </label>
 
   <br><br>
 
-  <button onclick="startTracking()">Start Monitoring</button>
+  <button onclick="startTracking()">Iniciar monitoramento</button>
 
-  <p id="status">Waiting to start...</p>
+  <p id="status">Aguardando o início...</p>
 
   <script>
     function startTracking() {
       const vehicleId = document.getElementById("vehicleId").value;
 
       if (!vehicleId) {
-        alert("Please enter the vehicle ID");
+        alert("Informe a identificação do veículo");
         return;
       }
 
       if (!navigator.geolocation) {
-        alert("Geolocation is not supported by this browser");
+        alert("Geolocalização não suportada neste navegador");
         return;
       }
 
       document.getElementById("status").innerText =
-        "Monitoring started for " + vehicleId;
+        "Monitoramento iniciado para " + vehicleId;
 
       navigator.geolocation.watchPosition(
         (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
+          const timestamp = new Date().toISOString();
 
           document.getElementById("status").innerText =
-            "Vehicle: " + vehicleId +
+            "Veículo: " + vehicleId +
             " | Lat: " + lat.toFixed(6) +
             " | Lon: " + lon.toFixed(6);
+
+          // Enviar GPS para o servidor
+          fetch("/api/location", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              vehicleId: vehicleId,
+              latitude: lat,
+              longitude: lon,
+              timestamp: timestamp
+            })
+          });
         },
         (error) => {
-          alert("Error getting location");
+          alert("Erro ao obter localização");
         },
         {
           enableHighAccuracy: true,
