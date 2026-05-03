@@ -24,43 +24,55 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+<script>
+  var map = L.map("map").setView([-22.30, -53.85], 15);
 
-  <script>
-    // Inicializa o mapa
-    var map = L.map("map").setView([-22.30, -53.85], 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19
+  }).addTo(map);
 
-    // Camada OpenStreetMap
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19
-    }).addTo(map);
+  var markers = {};
+  var polylines = {};
 
-    var markers = {};
+  function atualizarMapa() {
+    fetch("/api/vehicles")
+      .then(function (res) {
+        return res.json();
+      })
+      .then(function (data) {
+        for (var id in data) {
+          var lat = data[id].latitude;
+          var lon = data[id].longitude;
 
-    function atualizarVeiculos() {
-      fetch("/api/vehicles")
-        .then(function (res) {
-          return res.json();
-        })
-        .then(function (data) {
-          console.log("Veículos recebidos:", data);
-
-          for (var id in data) {
-            var lat = data[id].latitude;
-            var lon = data[id].longitude;
-
-            if (markers[id]) {
-              markers[id].setLatLng([lat, lon]);
-            } else {
-              markers[id] = L.marker([lat, lon])
-                .addTo(map)
-                .bindPopup("Veículo: " + id);
-            }
+          // Marcador
+          if (!markers[id]) {
+            markers[id] = L.marker([lat, lon]).addTo(map);
+          } else {
+            markers[id].setLatLng([lat, lon]);
           }
-        });
-    }
 
-    setInterval(atualizarVeiculos, 3000);
-  </script>
+          // Buscar trajeto
+          fetch("/api/track/" + id)
+            .then(function (res) {
+              return res.json();
+            })
+            .then(function (track) {
+              if (polylines[id]) {
+                polylines[id].setLatLngs(track);
+              } else {
+                polylines[id] = L.polyline(track, {
+                  color: "blue",
+                  weight: 4
+                }).addTo(map);
+              }
+            });
+        }
+      });
+  }
 
+  setInterval(atualizarMapa, 3000);
+</script>
+  
 </body>
 </html>
