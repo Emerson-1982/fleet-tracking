@@ -1,3 +1,5 @@
+// Store last position of each vehicle (in memory)
+const vehicles = {};
 const express = require("express");
 const path = require("path");
 
