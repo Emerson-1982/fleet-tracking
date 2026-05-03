@@ -1,3 +1,5 @@
+const gpsRoutes = require("./routes/gps");
+const relatorioRoutes = require("./routes/relatorio");
 // Store last position of each vehicle (in memory)
 const vehicles = {};
 const express = require("express");
