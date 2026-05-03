@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Monitoramento de Frota</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 70vh;
+      width: 100%;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Monitoramento de Veículos</h2>
+
+  <label>
+    Identificação do veículo:
+    <input type="text" id="vehicleId" value="CAM-01">
+  </label>
+  <button onclick="startTracking()">Iniciar monitoramento</button>
+
+  <p id="status">Aguardando o início...</p>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    var map = L.map("map").setView([-22.30, -53.85], 15);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+
+    var marker = null;
+    var polyline = null;
+    var track = [];
+
+    function startTracking() {
+      var vehicleId = document.getElementById("vehicleId").value;
+
+      if (!navigator.geolocation) {
+        alert("Geolocalização não suportada");
+        return;
+      }
+
+      navigator.geolocation.watchPosition(
+        function (position) {
+          var lat = position.coords.latitude;
+          var lon = position.coords.longitude;
+
+          document.getElementById("status").innerText =
+            "Veículo: " + vehicleId +
+            " | Lat: " + lat.toFixed(6) +
+            " | Lon: " + lon.toFixed(6);
+
+          // Enviar GPS para o backend
+          fetch("/api/location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              vehicleId: vehicleId,
+              latitude: lat,
+              longitude: lon,
+              timestamp: new Date().toISOString()
+            })
+          });
+
+          // Atualizar ponto
+          if (!marker) {
+            marker = L.marker([lat, lon]).addTo(map);
+          } else {
+            marker.setLatLng([lat, lon]);
+          }
+
+          // Atualizar trajeto
+          track.push([lat, lon]);
+
+          if (!polyline) {
+            polyline = L.polyline(track, {
+              color: "blue",
+              weight: 4
+            }).addTo(map);
+          } else {
+            polyline.setLatLngs(track);
+          }
+        }
+      );
+    }
+  </script>
+
+</body>
+</html>
