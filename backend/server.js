@@ -7,6 +7,9 @@ const path = require("path");
 
 const app = express();
 
+// Enable JSON body parsing
+app.use(express.json());
+
 // Serve static files from public folder
 app.use(express.static(path.join(__dirname, "public")));
 
