@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+
+// Guardar posição dos veículos em memória
+const vehicles = {};
 
 // Recebe localização do veículo
 router.post("/location", function (req, res) {
@@ -9,19 +11,24 @@ router.post("/location", function (req, res) {
   const longitude = req.body.longitude;
   const timestamp = req.body.timestamp;
 
-  db.query(
-    `INSERT INTO gps_positions
-     (vehicle_id, latitude, longitude, created_at)
-     VALUES ($1, $2, $3, $4)`,
-    [vehicleId, latitude, longitude, timestamp]
-  )
-    .then(function () {
-      res.json({ status: "OK" });
-    })
-    .catch(function (error) {
-      console.error("Erro ao salvar GPS:", error);
-      res.status(500).json({ error: "Erro ao salvar posição" });
-    });
+  if (!vehicleId || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ error: "Dados inválidos" });
+  }
+
+  vehicles[vehicleId] = {
+    latitude: latitude,
+    longitude: longitude,
+    timestamp: timestamp
+  };
+
+  console.log("GPS recebido:", vehicleId, latitude, longitude);
+
+  res.json({ status: "OK" });
+});
+
+// ✅ ESTA É A ROTA QUE ESTAVA FALTANDO
+router.get("/vehicles", function (req, res) {
+  res.json(vehicles);
 });
 
 module.exports = router;
