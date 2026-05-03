@@ -26,10 +26,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Inicializa o mapa (região aproximada)
+    // Inicializa o mapa
     var map = L.map("map").setView([-22.30, -53.85], 14);
 
-    // Camada do OpenStreetMap
+    // Camada OpenStreetMap
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19
     }).addTo(map);
@@ -38,10 +38,12 @@
 
     function atualizarVeiculos() {
       fetch("/api/vehicles")
-        .then(function (response) {
-          return response.json();
+        .then(function (res) {
+          return res.json();
         })
         .then(function (data) {
+          console.log("Veículos recebidos:", data);
+
           for (var id in data) {
             var lat = data[id].latitude;
             var lon = data[id].longitude;
@@ -57,7 +59,6 @@
         });
     }
 
-    // Atualiza a cada 3 segundos
     setInterval(atualizarVeiculos, 3000);
   </script>
 
