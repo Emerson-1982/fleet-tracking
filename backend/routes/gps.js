@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
-// Guardar posição dos veículos em memória
+// Última posição
 const vehicles = {};
 
-// Recebe localização do veículo
+// Histórico de posições (trajeto)
+const tracks = {};
+
 router.post("/location", function (req, res) {
   const vehicleId = req.body.vehicleId;
   const latitude = req.body.latitude;
@@ -15,20 +17,32 @@ router.post("/location", function (req, res) {
     return res.status(400).json({ error: "Dados inválidos" });
   }
 
+  // Última posição
   vehicles[vehicleId] = {
     latitude: latitude,
     longitude: longitude,
     timestamp: timestamp
   };
 
-  console.log("GPS recebido:", vehicleId, latitude, longitude);
+  // Histórico (trajeto)
+  if (!tracks[vehicleId]) {
+    tracks[vehicleId] = [];
+  }
+
+  tracks[vehicleId].push([latitude, longitude]);
 
   res.json({ status: "OK" });
 });
 
-// ✅ ESTA É A ROTA QUE ESTAVA FALTANDO
+// Retorna veículos (ponto)
 router.get("/vehicles", function (req, res) {
   res.json(vehicles);
+});
+
+// ✅ NOVA ROTA — Retorna trajeto
+router.get("/track/:vehicleId", function (req, res) {
+  const vehicleId = req.params.vehicleId;
+  res.json(tracks[vehicleId] || []);
 });
 
 module.exports = router;
