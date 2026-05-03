@@ -1,0 +1,7 @@
+CREATE TABLE gps_positions (
+  id SERIAL PRIMARY KEY,
+  vehicle_id VARCHAR(50) NOT NULL,
+  latitude DOUBLE PRECISION NOT NULL,
+  longitude DOUBLE PRECISION NOT NULL,
+  created_at TIMESTAMP NOT NULL
+);
