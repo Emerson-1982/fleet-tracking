@@ -1,33 +1,24 @@
-const gpsRoutes = require("./routes/gps");
-const relatorioRoutes = require("./routes/relatorio");
-// Store last position of each vehicle (in memory)
-const vehicles = {};
 const express = require("express");
 const path = require("path");
+
+const gpsRoutes = require("./routes/gps");
+const relatorioRoutes = require("./routes/relatorio");
 
 const app = express();
 
 // Enable JSON body parsing
 app.use(express.json());
 
-// Serve static files from public folder
+// Serve static files
 app.use(express.static(path.join(__dirname, "public")));
 
+// API routes
+app.use("/api", gpsRoutes);
+app.use("/api", relatorioRoutes);
+
+// Root route
 app.get("/", (req, res) => {
   res.send("Fleet Tracking Server is running ✅");
-});
-
-// Receive GPS data from vehicles
-app.post("/api/location", (req, res) => {
-  const { vehicleId, latitude, longitude, timestamp } = req.body;
-
-  console.log("GPS received:");
-  console.log("Vehicle:", vehicleId);
-  console.log("Latitude:", latitude);
-  console.log("Longitude:", longitude);
-  console.log("Time:", timestamp);
-
-  res.json({ status: "OK" });
 });
 
 app.listen(3000, () => {
