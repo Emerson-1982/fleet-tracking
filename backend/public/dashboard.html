@@ -50,8 +50,10 @@
 
   var lastPosition = null;
   var stopStartTime = null;
-  var STOP_DISTANCE = 10;      // metros
-  var STOP_TIME = 2 * 60 * 1000; // 2 minutos
+  var totalStoppedTime = 0;
+
+  var STOP_DISTANCE = 20;          // metros
+  var STOP_TIME = 3 * 60 * 1000;   // 3 minutos
 
   function startTracking() {
     var vehicleId = document.getElementById("vehicleId").value;
@@ -60,9 +62,10 @@
       function (position) {
         var lat = position.coords.latitude;
         var lon = position.coords.longitude;
-        var now = new Date().getTime();
+        var now = Date.now();
 
         var status = "MOVIMENTO";
+        var stoppedTimeDisplay = formatTime(totalStoppedTime);
 
         if (lastPosition) {
           var distance = calcDistance(
@@ -76,11 +79,18 @@
             if (!stopStartTime) {
               stopStartTime = now;
             }
+
             if (now - stopStartTime >= STOP_TIME) {
               status = "PARADO";
+              stoppedTimeDisplay = formatTime(
+                totalStoppedTime + (now - stopStartTime)
+              );
             }
           } else {
-            stopStartTime = null;
+            if (stopStartTime) {
+              totalStoppedTime += (now - stopStartTime);
+              stopStartTime = null;
+            }
           }
         }
 
@@ -89,10 +99,11 @@
         document.getElementById("status").innerText =
           "Veículo: " + vehicleId +
           " | Status: " + status +
+          " | Tempo parado: " + stoppedTimeDisplay +
           " | Lat: " + lat.toFixed(6) +
           " | Lon: " + lon.toFixed(6);
 
-        // Enviar para backend
+        // Enviar para o backend
         fetch("/api/location", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -134,9 +145,23 @@
       Math.cos(lat2 * Math.PI / 180) *
       Math.sin(dLon/2) * Math.sin(dLon/2);
 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
+
+  function formatTime(ms) {
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+
+    return (
+      String(hours).padStart(2, "0") + ":" +
+      String(minutes).padStart(2, "0") + ":" +
+      String(seconds).padStart(2, "0")
+    );
+  }
 </script>
+
 </body>
 </html>
