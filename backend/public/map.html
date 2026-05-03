@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Mapa da Frota</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    #map {
+      height: 90vh;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Mapa de Monitoramento de Veículos</h2>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Inicializa o mapa (região aproximada)
+    var map = L.map("map").setView([-22.30, -53.85], 14);
+
+    // Camada do OpenStreetMap
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
+
+    var markers = {};
+
+    function atualizarVeiculos() {
+      fetch("/api/vehicles")
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          for (var id in data) {
+            var lat = data[id].latitude;
+            var lon = data[id].longitude;
+
+            if (markers[id]) {
+              markers[id].setLatLng([lat, lon]);
+            } else {
+              markers[id] = L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup("Veículo: " + id);
+            }
+          }
+        });
+    }
+
+    // Atualiza a cada 3 segundos
+    setInterval(atualizarVeiculos, 3000);
+  </script>
+
+</body>
+</html>
