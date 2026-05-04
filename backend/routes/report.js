@@ -2,24 +2,28 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// Retorna histórico de um veículo
-router.get("/history/:vehicleId", async (req, res) => {
-  const { vehicleId } = req.params;
+/*
+  Relatório diário de tempo parado por veículo
+*/
+router.get("/daily/:vehicleId", function (req, res) {
+  const vehicleId = req.params.vehicleId;
 
-  try {
-    const result = await db.query(
-      `SELECT latitude, longitude, created_at
-       FROM gps_positions
-       WHERE vehicle_id = $1
-       ORDER BY created_at`,
-      [vehicleId]
-    );
-
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Erro ao buscar histórico:", error);
-    res.status(500).json({ error: "Erro ao buscar histórico" });
-  }
+  db.query(
+    `
+    SELECT
+      DATE(stop_start) AS dia,
+      SUM(duration_seconds) AS total_parado_segundos
+    FROM vehicle_stops
+    WHERE vehicle_id = $1
+    GROUP BY dia
+    ORDER BY dia DESC
+    `,
+    [vehicleId]
+  )
+    .then(result => res.json(result.rows))
+    .catch(err => {
+      res.status(500).json({ error: err.message });
+    });
 });
 
 module.exports = router;
