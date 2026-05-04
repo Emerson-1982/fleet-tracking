@@ -63,45 +63,42 @@
         var lat = position.coords.latitude;
         var lon = position.coords.longitude;
         var now = Date.now();
+      
+      var status = "MOVIMENTO";
 
-        var status = "MOVIMENTO";
-        var stoppedTimeDisplay = formatTime(totalStoppedTime);
+if (lastPosition) {
+  var distance = calcDistance(
+    lastPosition.lat,
+    lastPosition.lon,
+    lat,
+    lon
+  );
 
-        if (lastPosition) {
-          var distance = calcDistance(
-            lastPosition.lat,
-            lastPosition.lon,
-            lat,
-            lon
-          );
+  if (distance < STOP_DISTANCE) {
+    if (!stopStartTime) {
+      stopStartTime = now;
+    }
 
-          if (distance < STOP_DISTANCE) {
-            if (!stopStartTime) {
-              stopStartTime = now;
-            }
+    var stoppedDuration = now - stopStartTime;
 
-            if (now - stopStartTime >= STOP_TIME) {
-              status = "PARADO";
-              stoppedTimeDisplay = formatTime(
-                totalStoppedTime + (now - stopStartTime)
-              );
-            }
-          } else {
-            if (stopStartTime) {
-              totalStoppedTime += (now - stopStartTime);
-              stopStartTime = null;
-            }
-          }
-        }
+    if (stoppedDuration >= STOP_TIME) {
+      status = "PARADO";
+      stoppedTimeDisplay = formatTime(
+        totalStoppedTime + stoppedDuration
+      );
+    } else {
+      status = "AGUARDANDO PARADA";
+      stoppedTimeDisplay = formatTime(stoppedDuration);
+    }
 
-        lastPosition = { lat: lat, lon: lon };
-
-        document.getElementById("status").innerText =
-          "Veículo: " + vehicleId +
-          " | Status: " + status +
-          " | Tempo parado: " + stoppedTimeDisplay +
-          " | Lat: " + lat.toFixed(6) +
-          " | Lon: " + lon.toFixed(6);
+  } else {
+    if (stopStartTime) {
+      totalStoppedTime += (now - stopStartTime);
+      stopStartTime = null;
+    }
+    status = "MOVIMENTO";
+  }
+}
 
         // Enviar para o backend
         fetch("/api/location", {
