@@ -37,128 +37,141 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-  var map = L.map("map").setView([-22.30, -53.85], 15);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19
-  }).addTo(map);
+  <script>
+    var map = L.map("map").setView([-22.30, -53.85], 15);
 
-  var marker = null;
-  var polyline = null;
-  var track = [];
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
 
-  var lastPosition = null;
-  var stopStartTime = null;
-  var totalStoppedTime = 0;
+    var marker = null;
+    var polyline = null;
+    var track = [];
 
-  var STOP_DISTANCE = 20;          // metros
-  var STOP_TIME = 3 * 60 * 1000;   // 3 minutos
+    var lastPosition = null;
+    var stopStartTime = null;
+    var totalStoppedTime = 0;
 
-  function startTracking() {
-    var vehicleId = document.getElementById("vehicleId").value;
+    var STOP_DISTANCE = 20;            // metros
+    var STOP_TIME = 3 * 60 * 1000;     // 3 minutos
 
-    navigator.geolocation.watchPosition(
-      function (position) {
-        var lat = position.coords.latitude;
-        var lon = position.coords.longitude;
-        var now = Date.now();
-      
-      var status = "MOVIMENTO";
+    function startTracking() {
+      var vehicleId = document.getElementById("vehicleId").value;
 
-if (lastPosition) {
-  var distance = calcDistance(
-    lastPosition.lat,
-    lastPosition.lon,
-    lat,
-    lon
-  );
+      navigator.geolocation.watchPosition(
+        function (position) {
+          var lat = position.coords.latitude;
+          var lon = position.coords.longitude;
+          var now = Date.now();
 
-  if (distance < STOP_DISTANCE) {
-    if (!stopStartTime) {
-      stopStartTime = now;
-    }
+          var status = "MOVIMENTO";
+          var stoppedTimeDisplay = formatTime(totalStoppedTime);
 
-    var stoppedDuration = now - stopStartTime;
+          if (lastPosition) {
+            var distance = calcDistance(
+              lastPosition.lat,
+              lastPosition.lon,
+              lat,
+              lon
+            );
 
-    if (stoppedDuration >= STOP_TIME) {
-      status = "PARADO";
-      stoppedTimeDisplay = formatTime(
-        totalStoppedTime + stoppedDuration
+            if (distance < STOP_DISTANCE) {
+              if (!stopStartTime) {
+                stopStartTime = now;
+              }
+
+              var paradaAtual = now - stopStartTime;
+
+              if (paradaAtual >= STOP_TIME) {
+                status = "PARADO";
+                stoppedTimeDisplay = formatTime(
+                  totalStoppedTime + paradaAtual
+                );
+              } else {
+                status = "AGUARDANDO PARADA";
+                stoppedTimeDisplay = formatTime(paradaAtual);
+              }
+
+            } else {
+              if (stopStartTime) {
+                totalStoppedTime += (now - stopStartTime);
+                stopStartTime = null;
+              }
+              status = "MOVIMENTO";
+            }
+          }
+
+          lastPosition = { lat: lat, lon: lon };
+
+          document.getElementById("status").innerText =
+            "Veículo: " + vehicleId +
+            " | Status: " + status +
+            " | Tempo parado: " + stoppedTimeDisplay +
+            " | Lat: " + lat.toFixed(6) +
+            " | Lon: " + lon.toFixed(6);
+
+          // Enviar para o backend
+          fetch("/api/location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              vehicleId: vehicleId,
+              latitude: lat,
+              longitude: lon,
+              timestamp: new Date().toISOString()
+            })
+          });
+
+          // Atualizar mapa
+          if (!marker) {
+            marker = L.marker([lat, lon]).addTo(map);
+          } else {
+            marker.setLatLng([lat, lon]);
+          }
+
+          track.push([lat, lon]);
+
+          if (!polyline) {
+            polyline = L.polyline(track, {
+              color: "blue",
+              weight: 4
+            }).addTo(map);
+          } else {
+            polyline.setLatLngs(track);
+          }
+        }
       );
-    } else {
-      status = "AGUARDANDO PARADA";
-      stoppedTimeDisplay = formatTime(stoppedDuration);
     }
 
-  } else {
-    if (stopStartTime) {
-      totalStoppedTime += (now - stopStartTime);
-      stopStartTime = null;
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      var R = 6371000;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+
+      var a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
     }
-    status = "MOVIMENTO";
-  }
-}
 
-        // Enviar para o backend
-        fetch("/api/location", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            vehicleId: vehicleId,
-            latitude: lat,
-            longitude: lon,
-            timestamp: new Date().toISOString()
-          })
-        });
+    function formatTime(ms) {
+      var totalSeconds = Math.floor(ms / 1000);
+      var hours = Math.floor(totalSeconds / 3600);
+      var minutes = Math.floor((totalSeconds % 3600) / 60);
+      var seconds = totalSeconds % 60;
 
-        // Atualizar mapa
-        if (!marker) {
-          marker = L.marker([lat, lon]).addTo(map);
-        } else {
-          marker.setLatLng([lat, lon]);
-        }
-
-        track.push([lat, lon]);
-
-        if (!polyline) {
-          polyline = L.polyline(track, { color: "blue", weight: 4 })
-            .addTo(map);
-        } else {
-          polyline.setLatLngs(track);
-        }
-      }
-    );
-  }
-
-  function calcDistance(lat1, lon1, lat2, lon2) {
-    var R = 6371000;
-    var dLat = (lat2 - lat1) * Math.PI / 180;
-    var dLon = (lon2 - lon1) * Math.PI / 180;
-
-    var a =
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  function formatTime(ms) {
-    var totalSeconds = Math.floor(ms / 1000);
-    var hours = Math.floor(totalSeconds / 3600);
-    var minutes = Math.floor((totalSeconds % 3600) / 60);
-    var seconds = totalSeconds % 60;
-
-    return (
-      String(hours).padStart(2, "0") + ":" +
-      String(minutes).padStart(2, "0") + ":" +
-      String(seconds).padStart(2, "0")
-    );
-  }
-</script>
+      return (
+        String(hours).padStart(2, "0") + ":" +
+        String(minutes).padStart(2, "0") + ":" +
+        String(seconds).padStart(2, "0")
+      );
+    }
+  </script>
 
 </body>
 </html>
