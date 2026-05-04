@@ -14,10 +14,33 @@
     body {
       font-family: Arial, sans-serif;
     }
+
     #map {
       height: 70vh;
       width: 100%;
       margin-top: 10px;
+    }
+
+    /* ===== STATUS INDICATOR ===== */
+    .status-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .status-movimento {
+      background-color: green;
+    }
+
+    .status-aguardando {
+      background-color: gold;
+    }
+
+    .status-parado {
+      background-color: red;
     }
   </style>
 </head>
@@ -31,7 +54,10 @@
   </label>
   <button onclick="startTracking()">Iniciar monitoramento</button>
 
-  <p id="status">Aguardando o início...</p>
+  <p>
+    <span id="statusIndicator" class="status-dot status-movimento"></span>
+    <span id="statusText">Aguardando o início...</span>
+  </p>
 
   <div id="map"></div>
 
@@ -53,8 +79,8 @@
     var stopStartTime = null;
     var totalStoppedTime = 0;
 
-    var STOP_DISTANCE = 20;            // metros
-    var STOP_TIME = 3 * 60 * 1000;     // 3 minutos
+    var STOP_DISTANCE = 20;          // metros
+    var STOP_TIME = 3 * 60 * 1000;   // 3 minutos
 
     function startTracking() {
       var vehicleId = document.getElementById("vehicleId").value;
@@ -104,14 +130,27 @@
 
           lastPosition = { lat: lat, lon: lon };
 
-          document.getElementById("status").innerText =
+          // Texto do status
+          document.getElementById("statusText").innerText =
             "Veículo: " + vehicleId +
             " | Status: " + status +
             " | Tempo parado: " + stoppedTimeDisplay +
             " | Lat: " + lat.toFixed(6) +
             " | Lon: " + lon.toFixed(6);
 
-          // Enviar para o backend
+          // Atualiza bolinha
+          var indicator = document.getElementById("statusIndicator");
+          indicator.className = "status-dot";
+
+          if (status === "MOVIMENTO") {
+            indicator.classList.add("status-movimento");
+          } else if (status === "AGUARDANDO PARADA") {
+            indicator.classList.add("status-aguardando");
+          } else if (status === "PARADO") {
+            indicator.classList.add("status-parado");
+          }
+
+          // Enviar para backend
           fetch("/api/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -133,10 +172,8 @@
           track.push([lat, lon]);
 
           if (!polyline) {
-            polyline = L.polyline(track, {
-              color: "blue",
-              weight: 4
-            }).addTo(map);
+            polyline = L.polyline(track, { color: "blue", weight: 4 })
+              .addTo(map);
           } else {
             polyline.setLatLngs(track);
           }
