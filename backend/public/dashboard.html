@@ -37,80 +37,116 @@
 </head>
 <body>
 
-  <h2>Monitoramento de Veículos</h2>
+<h2>Monitoramento de Veículos</h2>
 
-  <label>
-    Identificação do veículo:
-    <input type="text" id="vehicleId" value="CAM-01">
-  </label>
-  <button onclick="startTracking()">Iniciar monitoramento</button>
+  <div style="display: flex;">
 
-  <p>
-    <span id="statusIndicator" class="status-dot status-movimento"></span>
-    <span id="statusText">Aguardando o início...</span><br>
-    <strong>Total parado hoje:</strong>
-    <span id="dailyStopped">00:00:00</span>
-  </p>
+    <!-- SIDEBAR -->
+    <div id="sidebar" style="width: 220px; padding: 8px; border-right: 1px solid #ccc;">
+      <h4>Veículos</h4>
+      <div id="vehicleList">
+        <!-- Checkboxes gerados dinamicamente -->
+      </div>
+    </div>
 
-  <div id="map"></div>
+    <!-- MAPA -->
+    <div style="flex: 1;">
+      <div id="map"></div>
+    </div>
+
+  </div>
+
+
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <script>   
+ <script>
   var map = L.map("map").setView([-22.30, -53.85], 14);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19
   }).addTo(map);
 
-  // Estruturas por veículo
-  var markers = {};      // marcador por veículo
-  var polylines = {};    // trajeto por veículo
-  var tracks = {};       // histórico por veículo
+  var markers = {};
+  var polylines = {};
+  var tracks = {};
+  var visibleVehicles = {};
+  var colors = ["red", "blue", "green", "orange", "purple", "brown"];
 
-  // Função para atualizar todos os veículos
+  function updateVehicleList(vehicles) {
+    var list = document.getElementById("vehicleList");
+    list.innerHTML = "";
+
+    Object.keys(vehicles).forEach(function (id, index) {
+      if (!(id in visibleVehicles)) visibleVehicles[id] = true;
+
+      var checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = visibleVehicles[id];
+      checkbox.onchange = function () {
+        visibleVehicles[id] = this.checked;
+        toggleVehicle(id);
+      };
+
+      var label = document.createElement("label");
+      label.innerText = " " + id;
+      label.style.display = "block";
+
+      label.prepend(checkbox);
+      list.appendChild(label);
+    });
+  }
+
+  function toggleVehicle(id) {
+    if (!visibleVehicles[id]) {
+      if (markers[id]) map.removeLayer(markers[id]);
+      if (polylines[id]) map.removeLayer(polylines[id]);
+    } else {
+      if (markers[id]) markers[id].addTo(map);
+      if (polylines[id]) polylines[id].addTo(map);
+    }
+  }
+
   function atualizarVeiculos() {
     fetch("/api/vehicles")
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (data) {
-        for (var vehicleId in data) {
-          var lat = data[vehicleId].latitude;
-          var lon = data[vehicleId].longitude;
+      .then(res => res.json())
+      .then(data => {
+        updateVehicleList(data);
 
-          // Cria histórico se não existir
-          if (!tracks[vehicleId]) {
-            tracks[vehicleId] = [];
-          }
+        var index = 0;
+        for (var id in data) {
+          var lat = data[id].latitude;
+          var lon = data[id].longitude;
 
-          tracks[vehicleId].push([lat, lon]);
+          if (!tracks[id]) tracks[id] = [];
+          tracks[id].push([lat, lon]);
 
-          // Marcador
-          if (!markers[vehicleId]) {
-            markers[vehicleId] = L.marker([lat, lon])
-              .addTo(map)
-              .bindPopup("Veículo: " + vehicleId);
+          var color = colors[index % colors.length];
+          index++;
+
+          if (!markers[id]) {
+            markers[id] = L.marker([lat, lon])
+              .bindPopup("Veículo: " + id);
+            if (visibleVehicles[id]) markers[id].addTo(map);
           } else {
-            markers[vehicleId].setLatLng([lat, lon]);
+            markers[id].setLatLng([lat, lon]);
           }
 
-          // Trajeto
-          if (!polylines[vehicleId]) {
-            polylines[vehicleId] = L.polyline(tracks[vehicleId], {
+          if (!polylines[id]) {
+            polylines[id] = L.polyline(tracks[id], {
+              color: color,
               weight: 4
-            }).addTo(map);
+            });
+            if (visibleVehicles[id]) polylines[id].addTo(map);
           } else {
-            polylines[vehicleId].setLatLngs(tracks[vehicleId]);
+            polylines[id].setLatLngs(tracks[id]);
           }
         }
       });
   }
 
-  // Atualiza a cada 5 segundos
   setInterval(atualizarVeiculos, 5000);
-  </script>
-
+</script>
 </body>
 </html>
