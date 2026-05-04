@@ -21,7 +21,6 @@
       margin-top: 10px;
     }
 
-    /* ===== STATUS INDICATOR ===== */
     .status-dot {
       display: inline-block;
       width: 12px;
@@ -31,17 +30,9 @@
       vertical-align: middle;
     }
 
-    .status-movimento {
-      background-color: green;
-    }
-
-    .status-aguardando {
-      background-color: gold;
-    }
-
-    .status-parado {
-      background-color: red;
-    }
+    .status-movimento { background-color: green; }
+    .status-aguardando { background-color: gold; }
+    .status-parado { background-color: red; }
   </style>
 </head>
 <body>
@@ -56,7 +47,9 @@
 
   <p>
     <span id="statusIndicator" class="status-dot status-movimento"></span>
-    <span id="statusText">Aguardando o início...</span>
+    <span id="statusText">Aguardando o início...</span><br>
+    <strong>Total parado hoje:</strong>
+    <span id="dailyStopped">00:00:00</span>
   </p>
 
   <div id="map"></div>
@@ -78,134 +71,133 @@
     var lastPosition = null;
     var stopStartTime = null;
     var totalStoppedTime = 0;
+    var dailyStoppedTime = 0;
+    var lastDay = new Date().toDateString();
+    var trackingStarted = false;
 
     var STOP_DISTANCE = 20;          // metros
     var STOP_TIME = 3 * 60 * 1000;   // 3 minutos
 
     function startTracking() {
+      if (trackingStarted) return;
+      trackingStarted = true;
+
       var vehicleId = document.getElementById("vehicleId").value;
 
-      navigator.geolocation.watchPosition(
-        function (position) {
-          var lat = position.coords.latitude;
-          var lon = position.coords.longitude;
-          var now = Date.now();
+      navigator.geolocation.watchPosition(function (position) {
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        var now = Date.now();
 
-          var status = "MOVIMENTO";
-          var stoppedTimeDisplay = formatTime(totalStoppedTime);
+        // Reset diário
+        var today = new Date().toDateString();
+        if (today !== lastDay) {
+          dailyStoppedTime = 0;
+          lastDay = today;
+        }
 
-          if (lastPosition) {
-            var distance = calcDistance(
-              lastPosition.lat,
-              lastPosition.lon,
-              lat,
-              lon
-            );
+        var status = "MOVIMENTO";
+        var stoppedTimeDisplay = formatTime(dailyStoppedTime);
 
-            if (distance < STOP_DISTANCE) {
-              if (!stopStartTime) {
-                stopStartTime = now;
-              }
+        if (lastPosition) {
+          var distance = calcDistance(
+            lastPosition.lat,
+            lastPosition.lon,
+            lat,
+            lon
+          );
 
-              var paradaAtual = now - stopStartTime;
-
-              if (paradaAtual >= STOP_TIME) {
-                status = "PARADO";
-                stoppedTimeDisplay = formatTime(
-                  totalStoppedTime + paradaAtual
-                );
-              } else {
-                status = "AGUARDANDO PARADA";
-                stoppedTimeDisplay = formatTime(paradaAtual);
-              }
-
-            } else {
-              if (stopStartTime) {
-                totalStoppedTime += (now - stopStartTime);
-                stopStartTime = null;
-              }
-              status = "MOVIMENTO";
+          if (distance < STOP_DISTANCE) {
+            if (!stopStartTime) {
+              stopStartTime = now;
             }
-          }
 
-          lastPosition = { lat: lat, lon: lon };
+            var paradaAtual = now - stopStartTime;
 
-          // Texto do status
-          document.getElementById("statusText").innerText =
-            "Veículo: " + vehicleId +
-            " | Status: " + status +
-            " | Tempo parado: " + stoppedTimeDisplay +
-            " | Lat: " + lat.toFixed(6) +
-            " | Lon: " + lon.toFixed(6);
+            if (paradaAtual >= STOP_TIME) {
+              status = "PARADO";
+              stoppedTimeDisplay = formatTime(dailyStoppedTime + paradaAtual);
+            } else {
+              status = "AGUARDANDO PARADA";
+              stoppedTimeDisplay = formatTime(paradaAtual);
+            }
 
-          // Atualiza bolinha
-          var indicator = document.getElementById("statusIndicator");
-          indicator.className = "status-dot";
-
-          if (status === "MOVIMENTO") {
-            indicator.classList.add("status-movimento");
-          } else if (status === "AGUARDANDO PARADA") {
-            indicator.classList.add("status-aguardando");
-          } else if (status === "PARADO") {
-            indicator.classList.add("status-parado");
-          }
-
-          // Enviar para backend
-          fetch("/api/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              vehicleId: vehicleId,
-              latitude: lat,
-              longitude: lon,
-              timestamp: new Date().toISOString()
-            })
-          });
-
-          // Atualizar mapa
-          if (!marker) {
-            marker = L.marker([lat, lon]).addTo(map);
           } else {
-            marker.setLatLng([lat, lon]);
-          }
-
-          track.push([lat, lon]);
-
-          if (!polyline) {
-            polyline = L.polyline(track, { color: "blue", weight: 4 })
-              .addTo(map);
-          } else {
-            polyline.setLatLngs(track);
+            if (stopStartTime) {
+              dailyStoppedTime += (now - stopStartTime);
+              stopStartTime = null;
+            }
+            status = "MOVIMENTO";
           }
         }
-      );
+
+        lastPosition = { lat: lat, lon: lon };
+
+        document.getElementById("statusText").innerText =
+          "Veículo: " + vehicleId +
+          " | Status: " + status +
+          " | Tempo parado: " + stoppedTimeDisplay +
+          " | Lat: " + lat.toFixed(6) +
+          " | Lon: " + lon.toFixed(6);
+
+        document.getElementById("dailyStopped").innerText =
+          formatTime(dailyStoppedTime);
+
+        var indicator = document.getElementById("statusIndicator");
+        indicator.className = "status-dot";
+        if (status === "MOVIMENTO") indicator.classList.add("status-movimento");
+        if (status === "AGUARDANDO PARADA") indicator.classList.add("status-aguardando");
+        if (status === "PARADO") indicator.classList.add("status-parado");
+
+        fetch("/api/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vehicleId: vehicleId,
+            latitude: lat,
+            longitude: lon,
+            timestamp: new Date().toISOString()
+          })
+        });
+
+        if (!marker) {
+          marker = L.marker([lat, lon]).addTo(map);
+        } else {
+          marker.setLatLng([lat, lon]);
+        }
+
+        track.push([lat, lon]);
+
+        if (!polyline) {
+          polyline = L.polyline(track, { color: "blue", weight: 4 }).addTo(map);
+        } else {
+          polyline.setLatLngs(track);
+        }
+      });
     }
 
     function calcDistance(lat1, lon1, lat2, lon2) {
       var R = 6371000;
       var dLat = (lat2 - lat1) * Math.PI / 180;
       var dLon = (lon2 - lon1) * Math.PI / 180;
-
       var a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
         Math.cos(lat1 * Math.PI / 180) *
         Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       return R * c;
     }
 
     function formatTime(ms) {
-      var totalSeconds = Math.floor(ms / 1000);
-      var hours = Math.floor(totalSeconds / 3600);
-      var minutes = Math.floor((totalSeconds % 3600) / 60);
-      var seconds = totalSeconds % 60;
-
+      var s = Math.floor(ms / 1000);
+      var h = Math.floor(s / 3600);
+      var m = Math.floor((s % 3600) / 60);
+      var sec = s % 60;
       return (
-        String(hours).padStart(2, "0") + ":" +
-        String(minutes).padStart(2, "0") + ":" +
-        String(seconds).padStart(2, "0")
+        String(h).padStart(2, "0") + ":" +
+        String(m).padStart(2, "0") + ":" +
+        String(sec).padStart(2, "0")
       );
     }
   </script>
