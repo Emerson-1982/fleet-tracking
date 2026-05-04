@@ -154,8 +154,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             vehicleId: vehicleId,
-            latitude: lat,
-            longitude: lon,
+            status: status,
             timestamp: new Date().toISOString()
           })
         });
