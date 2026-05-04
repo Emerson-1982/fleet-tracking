@@ -1,10 +1,13 @@
 const express = require("express");
 const path = require("path");
+const gpsRoutes = require("./routes/gps");
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+app.use("/api", gpsRoutes);
 
 app.get("/", function (req, res) {
   res.send("Fleet Tracking Server is running ✅");
