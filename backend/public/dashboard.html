@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Monitoramento de Frota</title>
 
+  <!-- Leaflet CSS -->
   https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
 
   <style>
@@ -17,130 +18,186 @@
       margin-top: 10px;
     }
 
-    #sidebar {
-      width: 220px;
-      padding: 8px;
-      border-right: 1px solid #ccc;
+    .status-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
     }
 
-    .vehicle-item {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .empty {
-      font-style: italic;
-      color: #777;
-    }
+    .status-movimento { background-color: green; }
+    .status-aguardando { background-color: gold; }
+    .status-parado { background-color: red; }
   </style>
 </head>
 <body>
 
-<h2>Monitoramento de Veículos</h2>
+  <h2>Monitoramento de Veículos</h2>
 
-<div style="display:flex;">
-  <div id="sidebar">
-    <h4>Veículos</h4>
-    <div id="vehicleList"></div>
-  </div>
+  <label>
+    Identificação do veículo:
+    <input type="text" id="vehicleId" value="CAM-01">
+  </label>
+  <button onclick="startTracking()">Iniciar monitoramento</button>
 
-  <div style="flex:1;">
-    <div id="map"></div>
-  </div>
-</div>
+  <p>
+    <span id="statusIndicator" class="status-dot status-movimento"></span>
+    <span id="statusText">Aguardando o início...</span><br>
+    <strong>Total parado hoje:</strong>
+    <span id="dailyStopped">00:00:00</span>
+  </p>
 
-https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
+  <div id="map"></div>
 
-<script>
-  var map = L.map("map").setView([-22.30, -53.85], 14);
+  <!-- Leaflet JS -->
+  https://unpkg.com/leaflet@1.9.4/dist/leaflet.jsscript>
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19
-  }).addTo(map);
+  <script>
+    var map = L.map("map").setView([-22.30, -53.85], 15);
 
-  var markers = {};
-  var polylines = {};
-  var tracks = {};
-  var visibleVehicles = {};
-  var colors = ["red", "blue", "green", "orange", "purple", "brown"];
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19
+    }).addTo(map);
 
-  function renderVehicleList(vehicles) {
-    var list = document.getElementById("vehicleList");
+    var marker = null;
+    var polyline = null;
+    var track = [];
 
-    if (Object.keys(vehicles).length === 0) {
-      list.innerHTML = "<div class='empty'>Nenhum veículo transmitindo</div>";
-      return;
-    }
+    var lastPosition = null;
+    var stopStartTime = null;
+    var totalStoppedTime = 0;
+    var dailyStoppedTime = 0;
+    var lastDay = new Date().toDateString();
+    var trackingStarted = false;
 
-    Object.keys(vehicles).forEach(function(id) {
-      if (document.getElementById("chk-" + id)) return;
+    var STOP_DISTANCE = 20;          // metros
+    var STOP_TIME = 3 * 60 * 1000;   // 3 minutos
 
-      visibleVehicles[id] = true;
+    function startTracking() {
+      if (trackingStarted) return;
+      trackingStarted = true;
 
-      var checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.id = "chk-" + id;
-      checkbox.checked = true;
-      checkbox.onchange = function () {
-        visibleVehicles[id] = this.checked;
-        toggleVehicle(id);
-      };
+      var vehicleId = document.getElementById("vehicleId").value;
 
-      var label = document.createElement("label");
-      label.className = "vehicle-item";
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(" " + id));
+      navigator.geolocation.watchPosition(function (position) {
+        var lat = position.coords.latitude;
+        var lon = position.coords.longitude;
+        var now = Date.now();
 
-      list.appendChild(label);
-    });
-  }
+        // Reset diário
+        var today = new Date().toDateString();
+        if (today !== lastDay) {
+          dailyStoppedTime = 0;
+          lastDay = today;
+        }
 
-  function toggleVehicle(id) {
-    if (!visibleVehicles[id]) {
-      if (markers[id]) map.removeLayer(markers[id]);
-      if (polylines[id]) map.removeLayer(polylines[id]);
-    } else {
-      if (markers[id]) markers[id].addTo(map);
-      if (polylines[id]) polylines[id].addTo(map);
-    }
-  }
+        var status = "MOVIMENTO";
+        var stoppedTimeDisplay = formatTime(dailyStoppedTime);
 
-  function atualizarVeiculos() {
-    fetch("/api/vehicles")
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        renderVehicleList(data);
+        if (lastPosition) {
+          var distance = calcDistance(
+            lastPosition.lat,
+            lastPosition.lon,
+            lat,
+            lon
+          );
 
-        var i = 0;
-        for (var id in data) {
-          var lat = data[id].latitude;
-          var lon = data[id].longitude;
+          if (distance < STOP_DISTANCE) {
+            if (!stopStartTime) {
+              stopStartTime = now;
+            }
 
-          if (!tracks[id]) tracks[id] = [];
-          tracks[id].push([lat, lon]);
+            var paradaAtual = now - stopStartTime;
 
-          var color = colors[i % colors.length];
-          i++;
+            if (paradaAtual >= STOP_TIME) {
+              status = "PARADO";
+              stoppedTimeDisplay = formatTime(dailyStoppedTime + paradaAtual);
+            } else {
+              status = "AGUARDANDO PARADA";
+              stoppedTimeDisplay = formatTime(paradaAtual);
+            }
 
-          if (!markers[id]) {
-            markers[id] = L.marker([lat, lon]).bindPopup("Veículo: " + id);
-            if (visibleVehicles[id]) markers[id].addTo(map);
           } else {
-            markers[id].setLatLng([lat, lon]);
-          }
-
-          if (!polylines[id]) {
-            polylines[id] = L.polyline(tracks[id], { color: color, weight: 4 });
-            if (visibleVehicles[id]) polylines[id].addTo(map);
-          } else {
-            polylines[id].setLatLngs(tracks[id]);
+            if (stopStartTime) {
+              dailyStoppedTime += (now - stopStartTime);
+              stopStartTime = null;
+            }
+            status = "MOVIMENTO";
           }
         }
-      });
-  }
 
-  setInterval(atualizarVeiculos, 5000);
-</script>
+        lastPosition = { lat: lat, lon: lon };
+
+        document.getElementById("statusText").innerText =
+          "Veículo: " + vehicleId +
+          " | Status: " + status +
+          " | Tempo parado: " + stoppedTimeDisplay +
+          " | Lat: " + lat.toFixed(6) +
+          " | Lon: " + lon.toFixed(6);
+
+        document.getElementById("dailyStopped").innerText =
+          formatTime(dailyStoppedTime);
+
+        var indicator = document.getElementById("statusIndicator");
+        indicator.className = "status-dot";
+        if (status === "MOVIMENTO") indicator.classList.add("status-movimento");
+        if (status === "AGUARDANDO PARADA") indicator.classList.add("status-aguardando");
+        if (status === "PARADO") indicator.classList.add("status-parado");
+
+        fetch("/api/location", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vehicleId: vehicleId,
+            latitude: lat,
+            longitude: lon,
+            timestamp: new Date().toISOString()
+          })
+        });
+
+        if (!marker) {
+          marker = L.marker([lat, lon]).addTo(map);
+        } else {
+          marker.setLatLng([lat, lon]);
+        }
+
+        track.push([lat, lon]);
+
+        if (!polyline) {
+          polyline = L.polyline(track, { color: "blue", weight: 4 }).addTo(map);
+        } else {
+          polyline.setLatLngs(track);
+        }
+      });
+    }
+
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      var R = 6371000;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a =
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function formatTime(ms) {
+      var s = Math.floor(ms / 1000);
+      var h = Math.floor(s / 3600);
+      var m = Math.floor((s % 3600) / 60);
+      var sec = s % 60;
+      return (
+        String(h).padStart(2, "0") + ":" +
+        String(m).padStart(2, "0") + ":" +
+        String(sec).padStart(2, "0")
+      );
+    }
+  </script>
 
 </body>
 </html>
