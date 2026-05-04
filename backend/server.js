@@ -1,6 +1,6 @@
 
-const relatorioRoutes = require("./routes/relatorio");
-app.use("/report", relatorioRoutes);
+const reportRoutes = require("./routes/report");
+app.use("/report", reportRoutes);
 const express = require("express");
 const path = require("path");
 const gpsRoutes = require("./routes/gps");
